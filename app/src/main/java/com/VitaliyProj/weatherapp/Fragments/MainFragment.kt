@@ -13,6 +13,8 @@ import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.registerForActivityResult
 import androidx.fragment.app.FragmentActivity
+import androidx.fragment.app.activityViewModels
+import com.VitaliyProj.weatherapp.MainViewModel
 import com.VitaliyProj.weatherapp.adapters.VpAdapter
 import com.VitaliyProj.weatherapp.adapters.WeatherModel
 import com.VitaliyProj.weatherapp.databinding.FragmentMainBinding
@@ -20,6 +22,7 @@ import com.android.volley.Request
 import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
 import com.google.android.material.tabs.TabLayoutMediator
+import com.squareup.picasso.Picasso
 import org.json.JSONObject
 import java.util.jar.Manifest
 const val API_KEY = "f0170757eeb24053bf4180424222203"
@@ -34,6 +37,7 @@ class MainFragment : Fragment() {
     )
     private lateinit var pLauncher: ActivityResultLauncher<String>
     private lateinit var binding: FragmentMainBinding
+    private val model: MainViewModel by activityViewModels()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -47,7 +51,8 @@ class MainFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         checkPermission()
         init()
-        requestWeatherData("London")
+        updateCurrentCard()
+        requestWeatherData("Moscow")
     }
 
     private fun init() = with(binding){
@@ -57,6 +62,18 @@ class MainFragment : Fragment() {
                 tab, pos -> tab.text = tList[pos]
         }.attach()
 
+    }
+
+    private fun updateCurrentCard() = with(binding){
+        model.liveDataCurrent.observe(viewLifecycleOwner){
+            val maxMinTemp = "${it.maxTemp}ºC/${it.minTemp}ºC"
+            tvData.text = it.time
+            tvCity.text = it.city
+            tvCurrentTemp.text = it.currentTemp
+            tvCondition.text = it.condition
+            tvMaxMin.text = maxMinTemp
+            Picasso.get().load("https:" + it.imageURL).into(imWeather)
+        }
     }
 
     private fun permissionListener(){
@@ -74,30 +91,28 @@ class MainFragment : Fragment() {
     }
 
     private fun requestWeatherData(city: String){
-        val url =
-            "https://api.weatherapi.com/v1/forecast.json?key=" +
-                    API_KEY +
-                    "&q=" +
-                    city +
-                    "&days=" +
-                    "2" +
-                    "&aqi=no&alerts=no\n"
+        val url = "https://api.weatherapi.com/v1/forecast.json?key=" +
+                API_KEY +
+                "&q=" +
+                city +
+                "&days=" +
+                "3" +
+                "&aqi=no&alerts=no"
         val queue = Volley.newRequestQueue(context)
         val request = StringRequest(
             Request.Method.GET,
             url,
             {
-                result -> parseWeatherData(result)
-
+                    result -> parseWeatherData(result)
             },
             {
-                error -> Log.d("MyLog","error: $error")
+                    error -> Log.d("MyLog", "Error: $error")
             }
         )
         queue.add(request)
     }
 
-    private fun parseWeatherData(result: String){
+    private fun parseWeatherData(result: String) {
         val mainObject = JSONObject(result)
         val list = parseDays(mainObject)
         parseCurrentData(mainObject, list[0])
@@ -107,21 +122,24 @@ class MainFragment : Fragment() {
         val list = ArrayList<WeatherModel>()
         val daysArray = mainObject.getJSONObject("forecast")
             .getJSONArray("forecastday")
-        val name = mainObject.getJSONObject("location").getString("name")
+        val name =  mainObject.getJSONObject("location").getString("name")
         for (i in 0 until daysArray.length()){
             val day = daysArray[i] as JSONObject
             val item = WeatherModel(
                 name,
                 day.getString("date"),
-                day.getJSONObject("day").getJSONObject("condition").getString("text"),
+                day.getJSONObject("day").getJSONObject("condition")
+                    .getString("text"),
                 "",
                 day.getJSONObject("day").getString("maxtemp_c"),
                 day.getJSONObject("day").getString("mintemp_c"),
-                day.getJSONObject("day").getJSONObject("condition").getString("icon"),
+                day.getJSONObject("day").getJSONObject("condition")
+                    .getString("icon"),
                 day.getJSONArray("hour").toString()
             )
             list.add(item)
         }
+        model.liveDataList.value = list
         return list
     }
 
@@ -129,16 +147,16 @@ class MainFragment : Fragment() {
         val item = WeatherModel(
             mainObject.getJSONObject("location").getString("name"),
             mainObject.getJSONObject("current").getString("last_updated"),
-            mainObject.getJSONObject("current").getJSONObject("condition").getString("text"),
+            mainObject.getJSONObject("current")
+                .getJSONObject("condition").getString("text"),
             mainObject.getJSONObject("current").getString("temp_c"),
             weatherItem.maxTemp,
             weatherItem.minTemp,
-            mainObject.getJSONObject("current").getJSONObject("condition").getString("icon"),
+            mainObject.getJSONObject("current")
+                .getJSONObject("condition").getString("icon"),
             weatherItem.hours
         )
-        Log.d("MyLog","City: ${item.maxTemp}")
-        Log.d("MyLog","Time: ${item.minTemp}")
-        Log.d("MyLog","Time: ${item.hours}")
+        model.liveDataCurrent.value = item
     }
 
     companion object {
