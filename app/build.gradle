@@ -5,6 +5,7 @@ plugins {
 
 android {
     compileSdk 32
+    compileOptions.encoding = 'utf-8'
 
     defaultConfig {
         applicationId "com.VitaliyProj.weatherapp"
